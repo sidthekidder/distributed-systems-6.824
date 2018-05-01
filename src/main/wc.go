@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"mapreduce"
 	"os"
+	"strings"
+	"strconv"
+	"unicode"
 )
 
 //
@@ -14,7 +17,28 @@ import (
 // of key/value pairs.
 //
 func mapF(filename string, contents string) []mapreduce.KeyValue {
-	// Your code here (Part II).
+	// split the content into a list of strings
+	stringsList := strings.FieldsFunc(contents, func(c rune) bool {
+		return !unicode.IsLetter(c) && !unicode.IsNumber(c)
+	})
+
+	// create a map to hold the frequency of each word
+	freq := make(map[string]int)
+
+	// for each word, count the frequency
+	for _, val := range stringsList {
+		freq[val] += 1
+	}
+
+	// create the slice of KeyValues
+	KVs := make([]mapreduce.KeyValue, len(freq))
+
+	// store all the frequencies into this slice
+	for k, v := range freq {
+		KVs = append(KVs, mapreduce.KeyValue{Key: k, Value: strconv.Itoa(v)})
+	}
+
+	return KVs
 }
 
 //
@@ -23,7 +47,17 @@ func mapF(filename string, contents string) []mapreduce.KeyValue {
 // any map task.
 //
 func reduceF(key string, values []string) string {
-	// Your code here (Part II).
+	sum := 0
+
+	// loop through all values of the Key and add them up
+	for _, val := range values {
+		i, err := strconv.Atoi(val)
+		if err == nil {
+			sum += i
+		}
+	}
+
+	return strconv.Itoa(sum)
 }
 
 // Can be run in 3 ways:
