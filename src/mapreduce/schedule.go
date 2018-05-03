@@ -1,6 +1,9 @@
 package mapreduce
 
-import "fmt"
+import (
+	"fmt"
+	"sync"
+)
 
 //
 // schedule() starts and waits for all tasks in the given phase (mapPhase
@@ -24,11 +27,33 @@ func schedule(jobName string, mapFiles []string, nReduce int, phase jobPhase, re
 	}
 
 	fmt.Printf("Schedule: %v %v tasks (%d I/Os)\n", ntasks, phase, n_other)
+	var wg sync.WaitGroup
 
-	// All ntasks tasks have to be scheduled on workers. Once all tasks
-	// have completed successfully, schedule() should return.
-	//
-	// Your code here (Part III, Part IV).
-	//
+	// loop through all the ntasks to be done, waiting for workers using the registerChan channel
+	for tasksIndex := 0 ; tasksIndex < ntasks ; tasksIndex++ {
+		// increment the WaitGroup
+		wg.Add(1)
+
+		// launch the goroutine and later call Done for each finished goroutine
+		go func(jobName string, mapFiles []string, phase jobPhase, tasksIndex int, n_other int, registerChan chan string) {
+			for {
+				rpc_info_str := <- registerChan
+
+				ok := call(rpc_info_str, "Worker.DoTask", DoTaskArgs{jobName, mapFiles[tasksIndex], phase, tasksIndex, n_other}, nil)
+				if ok == true {
+					// call waitgroup.Done() before sending working back to registerChan
+					// because it blocks till it is received and for the 20th element there are no more receivers
+					wg.Done()
+					registerChan <- rpc_info_str
+					break
+				}
+			}
+		}(jobName, mapFiles, phase, tasksIndex, n_other, registerChan)
+	}
+
+	// wait for all the goroutines to finish
+	wg.Wait()
+
 	fmt.Printf("Schedule: %v done\n", phase)
+	return
 }
